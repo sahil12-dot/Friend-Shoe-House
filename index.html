@@ -1,0 +1,123 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friend Shoes House | Premium Footwear</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<header class="navbar">
+    <a href="#" class="logo">FRIEND<span> SHOES</span></a>
+
+    <nav>
+        <a href="#home">Home</a>
+        <a href="#products">Collection</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+    </nav>
+
+    <button class="cart-btn" onclick="toggleCart()">
+        🛒 Cart (<span id="cart-count">0</span>)
+    </button>
+</header>
+
+<section class="hero" id="home">
+    <div class="hero-content">
+        <p class="tagline">STEP INTO YOUR STYLE</p>
+        <h1>WALK WITH<br><span>CONFIDENCE.</span></h1>
+        <p>Discover your perfect pair. Premium style, comfort and quality for every step.</p>
+        <a href="#products" class="main-btn">SHOP NOW →</a>
+    </div>
+    <div class="hero-image">
+        <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=900" alt="Red sports shoes">
+    </div>
+</section>
+
+<section class="features">
+    <div>🚚 Free Delivery <small>On selected orders</small></div>
+    <div>👟 Premium Quality <small>Quality footwear</small></div>
+    <div>💬 Easy Ordering <small>Order through WhatsApp</small></div>
+</section>
+
+<section class="products-section" id="products">
+    <div class="section-heading">
+        <p>OUR COLLECTION</p>
+        <h2>FIND YOUR <span>PERFECT PAIR</span></h2>
+    </div>
+
+    <div class="filters">
+        <button class="filter active" onclick="filterProducts('All',this)">All</button>
+        <button class="filter" onclick="filterProducts('Sneakers',this)">Sneakers</button>
+        <button class="filter" onclick="filterProducts('Sports',this)">Sports</button>
+        <button class="filter" onclick="filterProducts('Casual',this)">Casual</button>
+    </div>
+
+    <div class="product-grid" id="product-list"></div>
+</section>
+
+<section class="about" id="about">
+    <div>
+        <p class="tagline">ABOUT OUR STORE</p>
+        <h2>MORE THAN SHOES.<br><span>IT'S YOUR STYLE.</span></h2>
+        <p>Welcome to Friend Shoes House. We bring you stylish, comfortable and quality footwear for your everyday lifestyle. Find your favourite pair and make every step count.</p>
+    </div>
+</section>
+
+<section class="contact" id="contact">
+    <h2>LET'S CONNECT</h2>
+    <p>Have a question about shoes or your order?</p>
+    <a href="#" onclick="contactWhatsApp();return false;" class="main-btn">CHAT ON WHATSAPP</a>
+</section>
+
+<footer>
+    <h2>FRIEND <span>SHOES HOUSE</span></h2>
+    <p>Style starts from your feet.</p>
+    <p>© 2026 Friend Shoes House. All Rights Reserved.</p>
+</footer>
+
+<!-- Shopping Cart -->
+<div class="overlay" id="overlay" onclick="toggleCart()"></div>
+
+<aside class="cart-panel" id="cart-panel">
+    <div class="cart-header">
+        <h2>Your Cart</h2>
+        <button onclick="toggleCart()">✕</button>
+    </div>
+
+    <div id="cart-items"></div>
+
+    <div class="cart-bottom">
+        <h3>Total: ₹<span id="cart-total">0</span></h3>
+        <button class="main-btn checkout-btn" onclick="openCheckout()">PROCEED TO CHECKOUT</button>
+    </div>
+</aside>
+
+<!-- Checkout -->
+<div class="checkout-modal" id="checkout-modal">
+    <div class="checkout-box">
+        <button class="close-btn" onclick="closeCheckout()">✕</button>
+        <h2>Complete Your Order</h2>
+        <p>Enter your delivery details below.</p>
+
+        <form id="checkout-form">
+            <input type="text" id="customer-name" placeholder="Your Full Name" required>
+            <input type="tel" id="customer-phone" placeholder="Mobile Number" pattern="[0-9]{10}" maxlength="10" required>
+            <textarea id="customer-address" placeholder="Full Delivery Address" required></textarea>
+            <select id="payment-method" required>
+                <option value="">Select Payment Method</option>
+                <option value="Cash on Delivery">Cash on Delivery</option>
+                <option value="UPI (Confirm with store)">UPI (Confirm with store)</option>
+            </select>
+            <button type="submit" class="main-btn">PLACE ORDER ON WHATSAPP</button>
+        </form>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
