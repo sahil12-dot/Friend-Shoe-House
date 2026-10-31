@@ -29,17 +29,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js";
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCLEyksgJX-zJNtHqinuhWxBO_ROQuFXfw",
-  authDomain: "gurmeet-df5f5.firebaseapp.com",
-  databaseURL: "https://gurmeet-df5f5-default-rtdb.firebaseio.com",
-  projectId: "gurmeet-df5f5",
-  storageBucket: "gurmeet-df5f5.firebasestorage.app",
-  messagingSenderId: "74024633945",
-  appId: "1:74024633945:web:649e4dfc6097fe253cd348",
-  measurementId: "G-WDB8RQ7HDZ"
+  apiKey: "AIzaSyAQtbmiwmxFv-sPVpZdgg4bp-Mi532ZY2o",
+  authDomain: "friend-shoes.firebaseapp.com",
+  databaseURL: "https://friend-shoes-default-rtdb.firebaseio.com",
+  projectId: "friend-shoes",
+  storageBucket: "friend-shoes.firebasestorage.app",
+  messagingSenderId: "633257885783",
+  appId: "1:633257885783:web:5b17e5108c6d30baa1a312",
+  measurementId: "G-WJV0NFBEC8"
 };
-
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
