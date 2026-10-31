@@ -1,93 +1,133 @@
 
-// CHANGE THIS TO YOUR BUSINESS WHATSAPP NUMBER
-// Example: 919876543210 (without + sign)
+import {
+    db,
+    collection,
+    onSnapshot
+} from "./firebase.js";
+
+// BUSINESS WHATSAPP NUMBER
 const WHATSAPP_NUMBER = "916280172514";
 
-// PRODUCTS
-const products = [
-    {
-        id: 1,
-        name: "Red Air Sneakers",
-        category: "Sneakers",
-        price: 1499,
-        image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600"
-    },
-    {
-        id: 2,
-        name: "Classic White Shoes",
-        category: "Casual",
-        price: 1199,
-        image: "https://images.unsplash.com/photo-1600269452121-4f2416e55c28?w=600"
-    },
-    {
-        id: 3,
-        name: "Sports Running Shoes",
-        category: "Sports",
-        price: 1799,
-        image: "https://images.unsplash.com/photo-1556906781-9a412961c28c?w=600"
-    },
-    {
-        id: 4,
-        name: "Black Street Sneakers",
-        category: "Sneakers",
-        price: 1599,
-        image: "https://images.unsplash.com/photo-1495555961986-6d4c1ecb7be3?w=600"
-    },
-    {
-        id: 5,
-        name: "Everyday Casual Shoes",
-        category: "Casual",
-        price: 999,
-        image: "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?w=600"
-    },
-    {
-        id: 6,
-        name: "Premium Sports Shoes",
-        category: "Sports",
-        price: 1999,
-        image: "https://images.unsplash.com/photo-1460353581641-37baddab0fa2?w=600"
-    }
-];
+// PRODUCTS FROM FIRESTORE
+let products = [];
 
 // CART
 let cart = JSON.parse(localStorage.getItem("friendShoesCart")) || [];
 
+let selectedCategory = "All";
+
+// HTML safety
+function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+    })[char]);
+}
+
+// Save cart
 function saveCart() {
     localStorage.setItem("friendShoesCart", JSON.stringify(cart));
 }
 
+// LOAD PRODUCTS FROM FIRESTORE
+function loadProducts() {
+    const list = document.getElementById("product-list");
+    list.innerHTML = "<p>Loading products...</p>";
+
+    onSnapshot(
+        collection(db, "products"),
+        (snapshot) => {
+            products = snapshot.docs.map(item => ({
+                id: item.id,
+                ...item.data()
+            }));
+
+            displayProducts(selectedCategory);
+        },
+        (error) => {
+            console.error("Product loading error:", error);
+            list.innerHTML = "<p>Unable to load products. Please try again.</p>";
+        }
+    );
+}
+
+// DISPLAY PRODUCTS
 function displayProducts(category = "All") {
+    selectedCategory = category;
+
     const list = document.getElementById("product-list");
 
     const filtered = category === "All"
         ? products
         : products.filter(p => p.category === category);
 
-    list.innerHTML = filtered.map(p => `
-        <div class="product-card">
-            <img src="${p.image}" alt="${p.name}" loading="lazy"
-                 onerror="this.src='https://placehold.co/600x400?text=Shoe'">
+    if (filtered.length === 0) {
+        list.innerHTML = "<p>No products available in this collection.</p>";
+        return;
+    }
 
-            <div class="product-info">
-                <span class="category">${p.category}</span>
-                <h3>${p.name}</h3>
-                <div class="price">₹${p.price.toLocaleString("en-IN")}</div>
+    list.innerHTML = filtered.map(p => {
+        const id = escapeHTML(p.id);
+        const name = escapeHTML(p.name);
+        const categoryName = escapeHTML(p.category);
+        const price = Number(p.price) || 0;
 
-                <select id="size-${p.id}" class="size-select"
-                    aria-label="Select shoe size"
-                    style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #ddd">
-                    <option value="">Select Size</option>
-                    ${[6,7,8,9,10,11].map(s => `<option value="${s}">UK ${s}</option>`).join("")}
-                </select>
+        let imageURL = "";
 
-                <button class="add-btn" onclick="addToCart(${p.id})">
-                    ADD TO CART +
-                </button>
+        try {
+            const parsedURL = new URL(p.image);
+            if (["https:", "http:"].includes(parsedURL.protocol)) {
+                imageURL = escapeHTML(p.image);
+            }
+        } catch {
+            imageURL = "";
+        }
+
+        return `
+            <div class="product-card">
+                <img
+                    src="${imageURL}"
+                    alt="${name}"
+                    loading="lazy"
+                    onerror="this.src='https://placehold.co/600x400?text=Shoe'"
+                >
+
+                <div class="product-info">
+                    <span class="category">${categoryName}</span>
+                    <h3>${name}</h3>
+
+                    <div class="price">
+                        ₹${price.toLocaleString("en-IN")}
+                    </div>
+
+                    <select id="size-${id}" class="size-select"
+                        aria-label="Select shoe size"
+                        style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #ddd">
+                        <option value="">Select Size</option>
+                        ${[6,7,8,9,10,11].map(s =>
+                            `<option value="${s}">UK ${s}</option>`
+                        ).join("")}
+                    </select>
+
+                    <button class="add-btn" data-product-id="${id}">
+                        ADD TO CART +
+                    </button>
+                </div>
             </div>
-        </div>
-    `).join("");
+        `;
+    }).join("");
+
+    list.querySelectorAll(".add-btn").forEach(button => {
+        button.addEventListener("click", () => {
+            addToCart(button.dataset.productId);
+        });
+    });
 }
 
+// FILTER PRODUCTS
 function filterProducts(category, button) {
     document.querySelectorAll(".filter").forEach(btn => {
         btn.classList.remove("active");
@@ -100,7 +140,11 @@ function filterProducts(category, button) {
 // ADD TO CART
 function addToCart(id) {
     const product = products.find(p => p.id === id);
-    const size = document.getElementById(`size-${id}`).value;
+
+    if (!product) return;
+
+    const sizeElement = document.getElementById(`size-${id}`);
+    const size = sizeElement.value;
 
     if (!size) {
         alert("Please select shoe size first!");
@@ -115,7 +159,11 @@ function addToCart(id) {
         existing.quantity++;
     } else {
         cart.push({
-            ...product,
+            id: product.id,
+            name: product.name,
+            category: product.category,
+            price: Number(product.price),
+            image: product.image,
             size: size,
             quantity: 1
         });
@@ -129,13 +177,17 @@ function addToCart(id) {
 // UPDATE CART
 function updateCart() {
     const items = document.getElementById("cart-items");
-    const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+    const count = cart.reduce(
+        (sum, item) => sum + item.quantity, 0
+    );
 
     const total = cart.reduce(
         (sum, item) => sum + item.price * item.quantity, 0
     );
 
     document.getElementById("cart-count").innerText = count;
+
     document.getElementById("cart-total").innerText =
         total.toLocaleString("en-IN");
 
@@ -147,19 +199,19 @@ function updateCart() {
     items.innerHTML = cart.map(item => `
         <div class="cart-item">
             <div>
-                <h4>${item.name}</h4>
-                <small>UK Size: ${item.size}</small>
-                <p>₹${item.price} × ${item.quantity}</p>
+                <h4>${escapeHTML(item.name)}</h4>
+                <small>UK Size: ${escapeHTML(item.size)}</small>
+                <p>₹${Number(item.price)} × ${item.quantity}</p>
 
                 <div class="quantity">
-                    <button onclick="changeQuantity(${item.id},'${item.size}',-1)">−</button>
+                    <button onclick="changeQuantity(${JSON.stringify(item.id)},'${escapeHTML(item.size)}',-1)">−</button>
                     <span>${item.quantity}</span>
-                    <button onclick="changeQuantity(${item.id},'${item.size}',1)">+</button>
+                    <button onclick="changeQuantity(${JSON.stringify(item.id)},'${escapeHTML(item.size)}',1)">+</button>
                 </div>
             </div>
 
             <button class="remove-btn"
-                onclick="removeItem(${item.id},'${item.size}')">
+                onclick="removeItem(${JSON.stringify(item.id)},'${escapeHTML(item.size)}')">
                 Remove
             </button>
         </div>
@@ -186,7 +238,7 @@ function changeQuantity(id, size, change) {
     updateCart();
 }
 
-// REMOVE PRODUCT
+// REMOVE ITEM
 function removeItem(id, size) {
     cart = cart.filter(
         p => !(p.id === id && p.size === size)
@@ -196,7 +248,7 @@ function removeItem(id, size) {
     updateCart();
 }
 
-// OPEN/CLOSE CART
+// CART OPEN/CLOSE
 function toggleCart() {
     document.getElementById("cart-panel").classList.toggle("open");
     document.getElementById("overlay").classList.toggle("open");
@@ -228,7 +280,7 @@ document.getElementById("checkout-form").addEventListener("submit", function(e) 
     }
 
     if (!/^91[6-9]\d{9}$/.test(WHATSAPP_NUMBER)) {
-        alert("Please set your correct WhatsApp business number in script.js");
+        alert("Please set your correct WhatsApp business number.");
         return;
     }
 
@@ -268,7 +320,6 @@ document.getElementById("checkout-form").addEventListener("submit", function(e) 
     const whatsappURL =
         `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 
-    // Save cart until customer returns; order is not yet confirmed.
     window.open(whatsappURL, "_blank");
 
     document.getElementById("checkout-modal").classList.remove("show");
@@ -276,11 +327,6 @@ document.getElementById("checkout-form").addEventListener("submit", function(e) 
 
 // CONTACT WHATSAPP
 function contactWhatsApp() {
-    if (!/^91[6-9]\d{9}$/.test(WHATSAPP_NUMBER)) {
-        alert("Please set your WhatsApp number in script.js first.");
-        return;
-    }
-
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
         "Hello Friend Shoes House! I want to know more about your shoes."
     )}`;
@@ -288,6 +334,15 @@ function contactWhatsApp() {
     window.open(url, "_blank");
 }
 
+// MAKE FUNCTIONS AVAILABLE TO HTML
+window.filterProducts = filterProducts;
+window.toggleCart = toggleCart;
+window.openCheckout = openCheckout;
+window.closeCheckout = closeCheckout;
+window.changeQuantity = changeQuantity;
+window.removeItem = removeItem;
+window.contactWhatsApp = contactWhatsApp;
+
 // INITIAL LOAD
-displayProducts();
 updateCart();
+loadProducts();
