@@ -22,7 +22,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_EXISTING_API_KEY",
+  apiKey: "AIzaSyAQtbmiwmxFv-sPVpZdgg4bp-Mi532ZY2o",
   authDomain: "friend-shoes.firebaseapp.com",
   databaseURL: "https://friend-shoes-default-rtdb.firebaseio.com",
   projectId: "friend-shoes",
