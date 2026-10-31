@@ -1,23 +1,18 @@
+
 import {
   auth,
   db,
-  storage,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   collection,
   addDoc,
-  getDocs,
-  doc,
   getDoc,
+  doc,
   updateDoc,
   deleteDoc,
   onSnapshot,
-  serverTimestamp,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject
+  serverTimestamp
 } from "./firebase.js";
 
 const loginSection = document.getElementById("login-section");
@@ -44,7 +39,6 @@ const cancelEdit = document.getElementById("cancel-edit");
 
 let products = [];
 let currentImageURL = "";
-let currentImagePath = "";
 let unsubscribeProducts = null;
 
 // Admin access check
@@ -72,13 +66,11 @@ onAuthStateChanged(auth, async (user) => {
 
     loginSection.hidden = true;
     dashboardSection.hidden = false;
-
     loadProducts();
 
   } catch (error) {
     console.error(error);
     loginError.textContent = "Could not verify admin access.";
-    await signOut(auth);
   }
 });
 
@@ -95,6 +87,7 @@ loginForm.addEventListener("submit", async (event) => {
     await signInWithEmailAndPassword(auth, email, password);
     loginError.textContent = "";
   } catch (error) {
+    console.error(error);
     loginError.textContent = "Invalid email or password.";
   }
 });
@@ -104,11 +97,9 @@ document.getElementById("logout-btn").addEventListener("click", async () => {
   await signOut(auth);
 });
 
-// Load products from Firestore
+// Load products
 function loadProducts() {
-  if (unsubscribeProducts) {
-    unsubscribeProducts();
-  }
+  if (unsubscribeProducts) unsubscribeProducts();
 
   unsubscribeProducts = onSnapshot(
     collection(db, "products"),
@@ -135,10 +126,8 @@ function renderProducts() {
   if (products.length === 0) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-
     cell.colSpan = 5;
     cell.textContent = "No products added yet.";
-
     row.appendChild(cell);
     productList.appendChild(row);
     return;
@@ -176,38 +165,22 @@ function renderProducts() {
 
     actionCell.append(editButton, deleteButton);
 
-    row.append(
-      imageCell,
-      nameCell,
-      categoryCell,
-      priceCell,
-      actionCell
-    );
-
+    row.append(imageCell, nameCell, categoryCell, priceCell, actionCell);
     productList.appendChild(row);
   });
 }
 
-// Image preview
-productImage.addEventListener("change", () => {
-  const file = productImage.files[0];
+// Image URL preview
+productImage.addEventListener("input", () => {
+  const url = productImage.value.trim();
 
-  if (!file) return;
-
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    alert("Please select a JPG, PNG or WebP image.");
-    productImage.value = "";
-    return;
+  if (url) {
+    imagePreview.src = url;
+    imagePreview.hidden = false;
+  } else {
+    imagePreview.src = "";
+    imagePreview.hidden = true;
   }
-
-  if (file.size > 5 * 1024 * 1024) {
-    alert("Image size must be less than 5 MB.");
-    productImage.value = "";
-    return;
-  }
-
-  imagePreview.src = URL.createObjectURL(file);
-  imagePreview.hidden = false;
 });
 
 // Add or update product
@@ -217,77 +190,45 @@ productForm.addEventListener("submit", async (event) => {
   const name = productName.value.trim();
   const category = productCategory.value;
   const price = Number(productPrice.value);
-  const file = productImage.files[0];
+  const imageURL = productImage.value.trim();
 
-  if (!name || !category || !Number.isFinite(price) || price <= 0) {
-    productMessage.textContent = "Please enter valid product details.";
+  if (!name || !category || !Number.isFinite(price) || price <= 0 || !imageURL) {
+    productMessage.textContent = "Please enter all product details and image URL.";
     return;
   }
 
-  if (!productId.value && !file) {
-    productMessage.textContent = "Please select a product image.";
+  try {
+    new URL(imageURL);
+
+    if (!["https:", "http:"].includes(new URL(imageURL).protocol)) {
+      throw new Error("Invalid image URL");
+    }
+  } catch {
+    productMessage.textContent = "Please enter a valid image URL.";
     return;
   }
 
   saveBtn.disabled = true;
   saveBtn.textContent = "Saving...";
-
-  let uploadedImagePath = "";
-  let uploadedImageURL = "";
+  productMessage.textContent = "";
 
   try {
-    let imageURL = currentImageURL;
-    let imagePath = currentImagePath;
-
-    // Upload new image
-    if (file) {
-      const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const newPath =
-        `product-images/${auth.currentUser.uid}/${Date.now()}-${safeFileName}`;
-
-      const imageRef = ref(storage, newPath);
-
-      await uploadBytes(imageRef, file);
-
-      uploadedImagePath = newPath;
-      uploadedImageURL = await getDownloadURL(imageRef);
-
-      imageURL = uploadedImageURL;
-      imagePath = uploadedImagePath;
-    }
-
     const productData = {
       name,
       category,
       price,
       image: imageURL,
-      imagePath,
       updatedAt: serverTimestamp()
     };
 
     if (productId.value) {
-      await updateDoc(
-        doc(db, "products", productId.value),
-        productData
-      );
-
-      // Remove old image after successful update
-      if (file && currentImagePath) {
-        try {
-          await deleteObject(ref(storage, currentImagePath));
-        } catch (error) {
-          console.warn("Old image could not be deleted:", error);
-        }
-      }
-
+      await updateDoc(doc(db, "products", productId.value), productData);
       productMessage.textContent = "Product updated successfully!";
-
     } else {
       await addDoc(collection(db, "products"), {
         ...productData,
         createdAt: serverTimestamp()
       });
-
       productMessage.textContent = "Product added successfully!";
     }
 
@@ -295,18 +236,7 @@ productForm.addEventListener("submit", async (event) => {
 
   } catch (error) {
     console.error(error);
-
-    // Clean up a newly uploaded image if saving the product failed
-    if (uploadedImagePath) {
-      try {
-        await deleteObject(ref(storage, uploadedImagePath));
-      } catch (cleanupError) {
-        console.warn(cleanupError);
-      }
-    }
-
     productMessage.textContent = "Error: " + error.message;
-
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = productId.value ? "Update Product" : "Add Product";
@@ -316,16 +246,15 @@ productForm.addEventListener("submit", async (event) => {
 // Edit product
 function editProduct(id) {
   const product = products.find((item) => item.id === id);
-
   if (!product) return;
 
   productId.value = product.id;
   productName.value = product.name || "";
   productCategory.value = product.category || "";
   productPrice.value = product.price || "";
+  productImage.value = product.image || "";
 
   currentImageURL = product.image || "";
-  currentImagePath = product.imagePath || "";
 
   if (currentImageURL) {
     imagePreview.src = currentImageURL;
@@ -335,47 +264,29 @@ function editProduct(id) {
   document.getElementById("form-heading").textContent = "Edit Product";
   saveBtn.textContent = "Update Product";
   cancelEdit.hidden = false;
-
   productMessage.textContent = "";
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 // Delete product
 async function deleteProduct(id) {
   const product = products.find((item) => item.id === id);
-
   if (!product) return;
 
-  const confirmed = confirm(
-    `Are you sure you want to delete "${product.name}"?`
-  );
-
-  if (!confirmed) return;
+  if (!confirm(`Are you sure you want to delete "${product.name}"?`)) {
+    return;
+  }
 
   try {
     await deleteDoc(doc(db, "products", id));
-
-    if (product.imagePath) {
-      try {
-        await deleteObject(ref(storage, product.imagePath));
-      } catch (error) {
-        console.warn("Product image could not be deleted:", error);
-      }
-    }
-
     productMessage.textContent = "Product deleted successfully!";
 
-    if (productId.value === id) {
-      resetForm();
-    }
+    if (productId.value === id) resetForm();
 
   } catch (error) {
     console.error(error);
-    productMessage.textContent = "Unable to delete product.";
+    productMessage.textContent = "Unable to delete product: " + error.message;
   }
 }
 
@@ -385,20 +296,16 @@ cancelEdit.addEventListener("click", resetForm);
 // Reset form
 function resetForm() {
   productForm.reset();
-
   productId.value = "";
   currentImageURL = "";
-  currentImagePath = "";
 
   imagePreview.src = "";
   imagePreview.hidden = true;
 
   document.getElementById("form-heading").textContent = "Add New Product";
-
   saveBtn.textContent = "Add Product";
   cancelEdit.hidden = true;
 }
 
-// Make functions available if needed
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
