@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Friend Shoes House | Admin Panel</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <h2>FRIEND <span>SHOES HOUSE</span></h2>
+    <p>Admin Panel</p>
+  </header>
+
+  <main class="container">
+
+    <!-- Login -->
+    <section id="login-section" class="login-box">
+      <h1>Admin Login</h1>
+      <p>Login to manage your store</p>
+
+      <form id="login-form">
+        <input
+          type="email"
+          id="email"
+          placeholder="Admin Email"
+          required
+        >
+
+        <input
+          type="password"
+          id="password"
+          placeholder="Password"
+          required
+        >
+
+        <button type="submit">Login</button>
+        <p id="login-error" class="message"></p>
+      </form>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dashboard-section" hidden>
+
+      <div class="dashboard-heading">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Manage your shoe products here.</p>
+        </div>
+
+        <button id="logout-btn" class="logout-btn">Logout</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <h3>Total Products</h3>
+          <h2 id="total-products">0</h2>
+        </div>
+      </div>
+
+      <!-- Product Form -->
+      <div class="panel">
+        <h2 id="form-heading">Add New Product</h2>
+
+        <form id="product-form">
+
+          <input type="hidden" id="product-id">
+
+          <label>Product Name</label>
+          <input
+            type="text"
+            id="product-name"
+            placeholder="Example: Nike Air Sneakers"
+            required
+          >
+
+          <label>Category</label>
+          <select id="product-category" required>
+            <option value="">Select Category</option>
+            <option value="Sneakers">Sneakers</option>
+            <option value="Sports">Sports</option>
+            <option value="Casual">Casual</option>
+            <option value="Men">Men</option>
+            <option value="Women">Women</option>
+            <option value="Kids">Kids</option>
+          </select>
+
+          <label>Price (₹)</label>
+          <input
+            type="number"
+            id="product-price"
+            min="1"
+            placeholder="1499"
+            required
+          >
+
+          <label>Product Image</label>
+          <input
+            type="file"
+            id="product-image"
+            accept="image/png,image/jpeg,image/webp"
+          >
+
+          <img id="image-preview" alt="Product preview" hidden>
+
+          <div class="form-buttons">
+            <button type="submit" id="save-btn">Add Product</button>
+            <button type="button" id="cancel-edit" hidden>Cancel</button>
+          </div>
+
+          <p id="product-message" class="message"></p>
+        </form>
+      </div>
+
+      <!-- Product List -->
+      <div class="panel">
+        <h2>Manage Products</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody id="admin-product-list">
+              <tr>
+                <td colspan="5">Loading products...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
