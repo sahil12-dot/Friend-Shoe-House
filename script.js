@@ -175,15 +175,17 @@ function addToCart(id) {
 }
 
 // UPDATE CART
+
+// UPDATE CART
 function updateCart() {
     const items = document.getElementById("cart-items");
 
     const count = cart.reduce(
-        (sum, item) => sum + item.quantity, 0
+        (sum, item) => sum + Number(item.quantity), 0
     );
 
     const total = cart.reduce(
-        (sum, item) => sum + item.price * item.quantity, 0
+        (sum, item) => sum + Number(item.price) * Number(item.quantity), 0
     );
 
     document.getElementById("cart-count").innerText = count;
@@ -196,26 +198,45 @@ function updateCart() {
         return;
     }
 
-    items.innerHTML = cart.map(item => `
+    items.innerHTML = cart.map((item, index) => `
         <div class="cart-item">
             <div>
                 <h4>${escapeHTML(item.name)}</h4>
                 <small>UK Size: ${escapeHTML(item.size)}</small>
-                <p>₹${Number(item.price)} × ${item.quantity}</p>
+                <p>₹${Number(item.price)} × ${Number(item.quantity)}</p>
 
                 <div class="quantity">
-                    <button onclick="changeQuantity(${JSON.stringify(item.id)},'${escapeHTML(item.size)}',-1)">−</button>
+                    <button type="button" data-action="decrease" data-index="${index}">−</button>
                     <span>${item.quantity}</span>
-                    <button onclick="changeQuantity(${JSON.stringify(item.id)},'${escapeHTML(item.size)}',1)">+</button>
+                    <button type="button" data-action="increase" data-index="${index}">+</button>
                 </div>
             </div>
 
-            <button class="remove-btn"
-                onclick="removeItem(${JSON.stringify(item.id)},'${escapeHTML(item.size)}')">
+            <button type="button" class="remove-btn"
+                data-action="remove" data-index="${index}">
                 Remove
             </button>
         </div>
     `).join("");
+
+    items.querySelectorAll("[data-action]").forEach(button => {
+        button.addEventListener("click", () => {
+            const index = Number(button.dataset.index);
+            const item = cart[index];
+
+            if (!item) return;
+
+            const action = button.dataset.action;
+
+            if (action === "increase") {
+                changeQuantity(item.id, item.size, 1);
+            } else if (action === "decrease") {
+                changeQuantity(item.id, item.size, -1);
+            } else if (action === "remove") {
+                removeItem(item.id, item.size);
+            }
+        });
+    });
 }
 
 // CHANGE QUANTITY
