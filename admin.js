@@ -7,32 +7,34 @@ import {
   onAuthStateChanged,
   collection,
   addDoc,
-  getDoc,
+  getDocs,
   doc,
+  getDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
   serverTimestamp
 } from "./firebase.js";
 
+
 // CLOUDINARY SETTINGS
 const CLOUD_NAME = "muorhog2";
 const UPLOAD_PRESET = "Friend Shoe";
+
 
 // HTML ELEMENTS
 const loginSection = document.getElementById("login-section");
 const dashboardSection = document.getElementById("dashboard-section");
 
 const loginForm = document.getElementById("login-form");
-const productForm = document.getElementById("product-form");
-
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
 const loginError = document.getElementById("login-error");
-const productMessage = document.getElementById("product-message");
 
-const productList = document.getElementById("admin-product-list");
-const totalProducts = document.getElementById("total-products");
+const logoutBtn = document.getElementById("logout-btn");
 
-const productId = document.getElementById("product-id");
+const productForm = document.getElementById("product-form");
+const productIdInput = document.getElementById("product-id");
 const productName = document.getElementById("product-name");
 const productCategory = document.getElementById("product-category");
 const productPrice = document.getElementById("product-price");
@@ -41,184 +43,176 @@ const productImages = document.getElementById("product-images");
 const imagePreview = document.getElementById("image-preview");
 
 const saveBtn = document.getElementById("save-btn");
-const cancelEdit = document.getElementById("cancel-edit");
+const cancelEditBtn = document.getElementById("cancel-edit");
 
-let products = [];
+const productMessage = document.getElementById("product-message");
+const productList = document.getElementById("admin-product-list");
+const totalProducts = document.getElementById("total-products");
+
+const formHeading = document.getElementById("form-heading");
+
+
+// VARIABLES
 let currentImages = [];
 let unsubscribeProducts = null;
 
-// ADMIN ACCESS CHECK
+
+// AUTHENTICATION
 onAuthStateChanged(auth, async (user) => {
-  if (!user) {
+
+  if (user) {
+
+    try {
+      const adminRef = doc(db, "admins", user.uid);
+      const adminSnapshot = await getDoc(adminRef);
+
+      if (adminSnapshot.exists()) {
+
+        loginSection.hidden = true;
+        dashboardSection.hidden = false;
+
+        loadProducts();
+
+      } else {
+
+        await signOut(auth);
+
+        loginError.textContent =
+          "You are not authorized as an admin.";
+
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+      loginError.textContent =
+        "Admin verification failed: " + error.message;
+
+    }
+
+  } else {
+
+    loginSection.hidden = false;
+    dashboardSection.hidden = true;
+
     if (unsubscribeProducts) {
       unsubscribeProducts();
       unsubscribeProducts = null;
     }
 
-    loginSection.hidden = false;
-    dashboardSection.hidden = true;
-    return;
   }
 
-  try {
-    const adminRef = doc(db, "admins", user.uid);
-    const adminSnapshot = await getDoc(adminRef);
-
-    if (!adminSnapshot.exists()) {
-      await signOut(auth);
-      loginError.textContent = "You are not authorized as admin.";
-      return;
-    }
-
-    loginSection.hidden = true;
-    dashboardSection.hidden = false;
-    loadProducts();
-
-  } catch (error) {
-    console.error(error);
-    loginError.textContent = "Could not verify admin access.";
-  }
 });
 
+
 // LOGIN
-loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
+loginForm.addEventListener("submit", async (e) => {
+
+  e.preventDefault();
 
   loginError.textContent = "Logging in...";
 
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
-
   try {
-    await signInWithEmailAndPassword(auth, email, password);
+
+    await signInWithEmailAndPassword(
+      auth,
+      emailInput.value.trim(),
+      passwordInput.value
+    );
+
     loginError.textContent = "";
+
   } catch (error) {
-    console.error(error);
-    loginError.textContent = "Invalid email or password.";
+
+    loginError.textContent = error.message;
+
   }
+
 });
+
 
 // LOGOUT
-document.getElementById("logout-btn").addEventListener("click", async () => {
-  await signOut(auth);
-});
+logoutBtn.addEventListener("click", async () => {
 
-// LOAD PRODUCTS
-function loadProducts() {
-  if (unsubscribeProducts) unsubscribeProducts();
+  try {
 
-  unsubscribeProducts = onSnapshot(
-    collection(db, "products"),
-    (snapshot) => {
-      products = snapshot.docs.map(item => ({
-        id: item.id,
-        ...item.data()
-      }));
+    await signOut(auth);
 
-      renderProducts();
-    },
-    (error) => {
-      console.error(error);
-      productList.textContent = "Unable to load products.";
-    }
-  );
-}
+    productForm.reset();
+    resetForm();
 
-// DISPLAY PRODUCTS
-function renderProducts() {
-  totalProducts.textContent = products.length;
-  productList.replaceChildren();
+  } catch (error) {
 
-  if (products.length === 0) {
-    const row = document.createElement("tr");
-    const cell = document.createElement("td");
-    cell.colSpan = 5;
-    cell.textContent = "No products added yet.";
-    row.appendChild(cell);
-    productList.appendChild(row);
-    return;
+    alert(error.message);
+
   }
 
-  products.forEach(product => {
-    const row = document.createElement("tr");
+});
 
-    const imageCell = document.createElement("td");
-    const image = document.createElement("img");
-
-    const images = product.images || [];
-    image.src = images[0] || product.image || "";
-    image.alt = product.name || "Product";
-    imageCell.appendChild(image);
-
-    const nameCell = document.createElement("td");
-    nameCell.textContent = product.name || "";
-
-    const categoryCell = document.createElement("td");
-    categoryCell.textContent = product.category || "";
-
-    const priceCell = document.createElement("td");
-    priceCell.textContent = "₹" + Number(product.price || 0);
-
-    const actionCell = document.createElement("td");
-
-    const editButton = document.createElement("button");
-    editButton.textContent = "Edit";
-    editButton.className = "edit-btn";
-    editButton.addEventListener("click", () => editProduct(product.id));
-
-    const deleteButton = document.createElement("button");
-    deleteButton.textContent = "Delete";
-    deleteButton.className = "delete-btn";
-    deleteButton.addEventListener("click", () => deleteProduct(product.id));
-
-    actionCell.append(editButton, deleteButton);
-
-    row.append(imageCell, nameCell, categoryCell, priceCell, actionCell);
-    productList.appendChild(row);
-  });
-}
 
 // IMAGE PREVIEW
-function showPreviews(urls) {
-  imagePreview.replaceChildren();
+function showPreviews() {
 
-  urls.forEach(url => {
+  imagePreview.innerHTML = "";
+
+  const files = Array.from(productImages.files || []);
+
+  currentImages.forEach((url) => {
+
     const img = document.createElement("img");
-    img.src = url;
-    img.alt = "Product preview";
 
-    img.style.width = "90px";
-    img.style.height = "90px";
-    img.style.objectFit = "cover";
-    img.style.borderRadius = "8px";
-    img.style.margin = "5px";
+    img.src = url;
+    img.alt = "Product image";
 
     imagePreview.appendChild(img);
+
   });
+
+  files.forEach((file) => {
+
+    const img = document.createElement("img");
+
+    img.src = URL.createObjectURL(file);
+    img.alt = "Selected image";
+
+    imagePreview.appendChild(img);
+
+  });
+
 }
 
-// SELECTED IMAGE PREVIEW
-productImages.addEventListener("change", () => {
-  const files = Array.from(productImages.files);
 
-  if (files.length + currentImages.length > 5) {
-    alert("Maximum 5 images allowed per product.");
+// IMAGE INPUT CHANGE
+productImages.addEventListener("change", () => {
+
+  const files = Array.from(productImages.files || []);
+
+  if (currentImages.length + files.length > 5) {
+
+    alert("You can upload maximum 5 images per product.");
+
     productImages.value = "";
+    showPreviews();
+
     return;
+
   }
 
-  const previews = files.map(file => URL.createObjectURL(file));
+  showPreviews();
 
-  showPreviews([...currentImages, ...previews]);
 });
+
 
 // UPLOAD IMAGES TO CLOUDINARY
 async function uploadImages(files) {
+
   const uploadedURLs = [];
 
   for (const file of files) {
+
     if (!file.type.startsWith("image/")) {
-      throw new Error("Please select valid image files.");
+      throw new Error("Please select image files only.");
     }
 
     const formData = new FormData();
@@ -237,149 +231,370 @@ async function uploadImages(files) {
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error?.message || "Image upload failed.");
+
+      throw new Error(
+        result.error?.message || "Image upload failed."
+      );
+
     }
 
     uploadedURLs.push(result.secure_url);
+
   }
 
   return uploadedURLs;
+
 }
 
-// ADD OR UPDATE PRODUCT
-productForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
+
+// ADD / UPDATE PRODUCT
+productForm.addEventListener("submit", async (e) => {
+
+  e.preventDefault();
 
   const name = productName.value.trim();
   const category = productCategory.value;
   const price = Number(productPrice.value);
 
-  const files = Array.from(productImages.files);
+  const files = Array.from(productImages.files || []);
+  const productId = productIdInput.value;
 
-  if (!name || !category || !Number.isFinite(price) || price <= 0) {
-    productMessage.textContent = "Please enter all product details.";
+  if (!name || !category || price <= 0) {
+
+    productMessage.textContent =
+      "Please fill all product details.";
+
     return;
+
   }
 
   if (currentImages.length + files.length > 5) {
-    productMessage.textContent = "Maximum 5 images allowed.";
+
+    productMessage.textContent =
+      "Maximum 5 images are allowed.";
+
     return;
+
   }
 
-  if (currentImages.length === 0 && files.length === 0) {
-    productMessage.textContent = "Please select at least one image.";
+  if (!productId && files.length === 0) {
+
+    productMessage.textContent =
+      "Please select at least one product image.";
+
     return;
+
   }
 
   saveBtn.disabled = true;
-  saveBtn.textContent = "Uploading Images...";
-  productMessage.textContent = "Please wait. Uploading images...";
+  saveBtn.textContent = "Please wait...";
+
+  productMessage.textContent = "Saving product...";
 
   try {
-    const newURLs = await uploadImages(files);
 
-    const allImages = [...currentImages, ...newURLs];
+    const newImages = await uploadImages(files);
+
+    const allImages = [
+      ...currentImages,
+      ...newImages
+    ];
 
     const productData = {
-      name,
-      category,
-      price,
+
+      name: name,
+      category: category,
+      price: price,
       images: allImages,
       image: allImages[0],
       updatedAt: serverTimestamp()
+
     };
 
-    if (productId.value) {
+    if (productId) {
+
       await updateDoc(
-        doc(db, "products", productId.value),
+        doc(db, "products", productId),
         productData
       );
 
-      productMessage.textContent = "Product updated successfully!";
+      productMessage.textContent =
+        "Product updated successfully!";
 
     } else {
-      await addDoc(collection(db, "products"), {
-        ...productData,
-        createdAt: serverTimestamp()
-      });
 
-      productMessage.textContent = "Product added successfully!";
+      productData.createdAt = serverTimestamp();
+
+      await addDoc(
+        collection(db, "products"),
+        productData
+      );
+
+      productMessage.textContent =
+        "Product added successfully!";
+
     }
 
+    productForm.reset();
     resetForm();
 
   } catch (error) {
+
     console.error(error);
-    productMessage.textContent = "Error: " + error.message;
+
+    productMessage.textContent =
+      "Error: " + error.message;
 
   } finally {
+
     saveBtn.disabled = false;
-    saveBtn.textContent = productId.value ? "Update Product" : "Add Product";
+
+    saveBtn.textContent = productIdInput.value
+      ? "Update Product"
+      : "Add Product";
+
   }
+
 });
 
-// EDIT PRODUCT
-function editProduct(id) {
-  const product = products.find(item => item.id === id);
-  if (!product) return;
 
-  productId.value = product.id;
-  productName.value = product.name || "";
-  productCategory.value = product.category || "";
-  productPrice.value = product.price || "";
+// LOAD PRODUCTS
+function loadProducts() {
 
-  currentImages = product.images?.length
-    ? [...product.images]
-    : product.image ? [product.image] : [];
+  if (unsubscribeProducts) {
+    unsubscribeProducts();
+  }
 
-  productImages.value = "";
-  showPreviews(currentImages);
+  unsubscribeProducts = onSnapshot(
+    collection(db, "products"),
 
-  document.getElementById("form-heading").textContent = "Edit Product";
-  saveBtn.textContent = "Update Product";
-  cancelEdit.hidden = false;
-  productMessage.textContent = "";
+    (snapshot) => {
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+      productList.innerHTML = "";
+
+      totalProducts.textContent = snapshot.size;
+
+      if (snapshot.empty) {
+
+        productList.innerHTML = `
+          <tr>
+            <td colspan="5">No products available.</td>
+          </tr>
+        `;
+
+        return;
+
+      }
+
+      snapshot.forEach((productDoc) => {
+
+        const product = productDoc.data();
+        const id = productDoc.id;
+
+        const firstImage =
+          product.images?.[0] || product.image || "";
+
+        const row = document.createElement("tr");
+
+        const imageCell = document.createElement("td");
+        const img = document.createElement("img");
+
+        img.src = firstImage;
+        img.alt = product.name || "Product";
+        img.style.width = "65px";
+        img.style.height = "65px";
+        img.style.objectFit = "cover";
+
+        imageCell.appendChild(img);
+
+        const nameCell = document.createElement("td");
+        nameCell.textContent = product.name || "";
+
+        const categoryCell = document.createElement("td");
+        categoryCell.textContent = product.category || "";
+
+        const priceCell = document.createElement("td");
+        priceCell.textContent = "₹" + product.price;
+
+        const actionCell = document.createElement("td");
+
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Edit";
+        editBtn.type = "button";
+        editBtn.dataset.action = "edit";
+        editBtn.dataset.id = id;
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Delete";
+        deleteBtn.type = "button";
+        deleteBtn.dataset.action = "delete";
+        deleteBtn.dataset.id = id;
+
+        actionCell.appendChild(editBtn);
+        actionCell.appendChild(deleteBtn);
+
+        row.appendChild(imageCell);
+        row.appendChild(nameCell);
+        row.appendChild(categoryCell);
+        row.appendChild(priceCell);
+        row.appendChild(actionCell);
+
+        productList.appendChild(row);
+
+      });
+
+    },
+
+    (error) => {
+
+      console.error(error);
+
+      productList.innerHTML = `
+        <tr>
+          <td colspan="5">Error loading products.</td>
+        </tr>
+      `;
+
+    }
+
+  );
+
 }
 
-// DELETE PRODUCT
-async function deleteProduct(id) {
-  const product = products.find(item => item.id === id);
-  if (!product) return;
 
-  if (!confirm(`Are you sure you want to delete "${product.name}"?`)) {
-    return;
+// EDIT / DELETE BUTTONS
+productList.addEventListener("click", async (e) => {
+
+  const button = e.target.closest("button");
+
+  if (!button) return;
+
+  const id = button.dataset.id;
+  const action = button.dataset.action;
+
+  if (action === "edit") {
+
+    await editProduct(id);
+
   }
+
+  if (action === "delete") {
+
+    await removeProduct(id);
+
+  }
+
+});
+
+
+// EDIT PRODUCT
+async function editProduct(id) {
 
   try {
-    await deleteDoc(doc(db, "products", id));
-    productMessage.textContent = "Product deleted successfully!";
 
-    if (productId.value === id) resetForm();
+    const productRef = doc(db, "products", id);
+    const snapshot = await getDoc(productRef);
+
+    if (!snapshot.exists()) {
+
+      alert("Product not found.");
+      return;
+
+    }
+
+    const product = snapshot.data();
+
+    productIdInput.value = id;
+
+    productName.value = product.name || "";
+    productCategory.value = product.category || "";
+    productPrice.value = product.price || "";
+
+    currentImages = product.images?.length
+      ? [...product.images]
+      : product.image
+        ? [product.image]
+        : [];
+
+    productImages.value = "";
+
+    showPreviews();
+
+    formHeading.textContent = "Edit Product";
+    saveBtn.textContent = "Update Product";
+
+    cancelEditBtn.hidden = false;
+
+    productMessage.textContent = "";
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
 
   } catch (error) {
-    console.error(error);
-    productMessage.textContent = "Unable to delete product: " + error.message;
+
+    alert("Error: " + error.message);
+
   }
+
 }
 
-// CANCEL EDIT
-cancelEdit.addEventListener("click", resetForm);
+
+// DELETE PRODUCT
+async function removeProduct(id) {
+
+  const confirmDelete = confirm(
+    "Are you sure you want to delete this product?"
+  );
+
+  if (!confirmDelete) return;
+
+  try {
+
+    await deleteDoc(
+      doc(db, "products", id)
+    );
+
+    alert("Product deleted successfully.");
+
+  } catch (error) {
+
+    alert("Error: " + error.message);
+
+  }
+
+}
+
 
 // RESET FORM
 function resetForm() {
-  productForm.reset();
-  productId.value = "";
+
+  productIdInput.value = "";
+
   currentImages = [];
 
-  imagePreview.replaceChildren();
+  productImages.value = "";
 
-  document.getElementById("form-heading").textContent = "Add New Product";
+  imagePreview.innerHTML = "";
+
+  formHeading.textContent = "Add New Product";
+
   saveBtn.textContent = "Add Product";
-  cancelEdit.hidden = true;
+
+  cancelEditBtn.hidden = true;
+
 }
 
-// GLOBAL FUNCTIONS
-window.editProduct = editProduct;
-window.deleteProduct = deleteProduct;
+
+// CANCEL EDIT
+cancelEditBtn.addEventListener("click", () => {
+
+  productForm.reset();
+
+  resetForm();
+
+  productMessage.textContent = "";
+
+});
+
