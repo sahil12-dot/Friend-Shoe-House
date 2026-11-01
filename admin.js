@@ -15,6 +15,11 @@ import {
   serverTimestamp
 } from "./firebase.js";
 
+// CLOUDINARY SETTINGS
+const CLOUD_NAME = "muorhog2";
+const UPLOAD_PRESET = "Friend Shoe";
+
+// HTML ELEMENTS
 const loginSection = document.getElementById("login-section");
 const dashboardSection = document.getElementById("dashboard-section");
 
@@ -31,17 +36,18 @@ const productId = document.getElementById("product-id");
 const productName = document.getElementById("product-name");
 const productCategory = document.getElementById("product-category");
 const productPrice = document.getElementById("product-price");
-const productImage = document.getElementById("product-image");
 
+const productImages = document.getElementById("product-images");
 const imagePreview = document.getElementById("image-preview");
+
 const saveBtn = document.getElementById("save-btn");
 const cancelEdit = document.getElementById("cancel-edit");
 
 let products = [];
-let currentImageURL = "";
+let currentImages = [];
 let unsubscribeProducts = null;
 
-// Admin access check
+// ADMIN ACCESS CHECK
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     if (unsubscribeProducts) {
@@ -74,7 +80,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// Login
+// LOGIN
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -92,19 +98,19 @@ loginForm.addEventListener("submit", async (event) => {
   }
 });
 
-// Logout
+// LOGOUT
 document.getElementById("logout-btn").addEventListener("click", async () => {
   await signOut(auth);
 });
 
-// Load products
+// LOAD PRODUCTS
 function loadProducts() {
   if (unsubscribeProducts) unsubscribeProducts();
 
   unsubscribeProducts = onSnapshot(
     collection(db, "products"),
     (snapshot) => {
-      products = snapshot.docs.map((item) => ({
+      products = snapshot.docs.map(item => ({
         id: item.id,
         ...item.data()
       }));
@@ -118,7 +124,7 @@ function loadProducts() {
   );
 }
 
-// Display products
+// DISPLAY PRODUCTS
 function renderProducts() {
   totalProducts.textContent = products.length;
   productList.replaceChildren();
@@ -133,12 +139,14 @@ function renderProducts() {
     return;
   }
 
-  products.forEach((product) => {
+  products.forEach(product => {
     const row = document.createElement("tr");
 
     const imageCell = document.createElement("td");
     const image = document.createElement("img");
-    image.src = product.image || "";
+
+    const images = product.images || [];
+    image.src = images[0] || product.image || "";
     image.alt = product.name || "Product";
     imageCell.appendChild(image);
 
@@ -170,65 +178,131 @@ function renderProducts() {
   });
 }
 
-// Image URL preview
-productImage.addEventListener("input", () => {
-  const url = productImage.value.trim();
+// IMAGE PREVIEW
+function showPreviews(urls) {
+  imagePreview.replaceChildren();
 
-  if (url) {
-    imagePreview.src = url;
-    imagePreview.hidden = false;
-  } else {
-    imagePreview.src = "";
-    imagePreview.hidden = true;
+  urls.forEach(url => {
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "Product preview";
+
+    img.style.width = "90px";
+    img.style.height = "90px";
+    img.style.objectFit = "cover";
+    img.style.borderRadius = "8px";
+    img.style.margin = "5px";
+
+    imagePreview.appendChild(img);
+  });
+}
+
+// SELECTED IMAGE PREVIEW
+productImages.addEventListener("change", () => {
+  const files = Array.from(productImages.files);
+
+  if (files.length + currentImages.length > 5) {
+    alert("Maximum 5 images allowed per product.");
+    productImages.value = "";
+    return;
   }
+
+  const previews = files.map(file => URL.createObjectURL(file));
+
+  showPreviews([...currentImages, ...previews]);
 });
 
-// Add or update product
+// UPLOAD IMAGES TO CLOUDINARY
+async function uploadImages(files) {
+  const uploadedURLs = [];
+
+  for (const file of files) {
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Please select valid image files.");
+    }
+
+    const formData = new FormData();
+
+    formData.append("file", file);
+    formData.append("upload_preset", UPLOAD_PRESET);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      {
+        method: "POST",
+        body: formData
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || "Image upload failed.");
+    }
+
+    uploadedURLs.push(result.secure_url);
+  }
+
+  return uploadedURLs;
+}
+
+// ADD OR UPDATE PRODUCT
 productForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const name = productName.value.trim();
   const category = productCategory.value;
   const price = Number(productPrice.value);
-  const imageURL = productImage.value.trim();
 
-  if (!name || !category || !Number.isFinite(price) || price <= 0 || !imageURL) {
-    productMessage.textContent = "Please enter all product details and image URL.";
+  const files = Array.from(productImages.files);
+
+  if (!name || !category || !Number.isFinite(price) || price <= 0) {
+    productMessage.textContent = "Please enter all product details.";
     return;
   }
 
-  try {
-    new URL(imageURL);
+  if (currentImages.length + files.length > 5) {
+    productMessage.textContent = "Maximum 5 images allowed.";
+    return;
+  }
 
-    if (!["https:", "http:"].includes(new URL(imageURL).protocol)) {
-      throw new Error("Invalid image URL");
-    }
-  } catch {
-    productMessage.textContent = "Please enter a valid image URL.";
+  if (currentImages.length === 0 && files.length === 0) {
+    productMessage.textContent = "Please select at least one image.";
     return;
   }
 
   saveBtn.disabled = true;
-  saveBtn.textContent = "Saving...";
-  productMessage.textContent = "";
+  saveBtn.textContent = "Uploading Images...";
+  productMessage.textContent = "Please wait. Uploading images...";
 
   try {
+    const newURLs = await uploadImages(files);
+
+    const allImages = [...currentImages, ...newURLs];
+
     const productData = {
       name,
       category,
       price,
-      image: imageURL,
+      images: allImages,
+      image: allImages[0],
       updatedAt: serverTimestamp()
     };
 
     if (productId.value) {
-      await updateDoc(doc(db, "products", productId.value), productData);
+      await updateDoc(
+        doc(db, "products", productId.value),
+        productData
+      );
+
       productMessage.textContent = "Product updated successfully!";
+
     } else {
       await addDoc(collection(db, "products"), {
         ...productData,
         createdAt: serverTimestamp()
       });
+
       productMessage.textContent = "Product added successfully!";
     }
 
@@ -237,29 +311,29 @@ productForm.addEventListener("submit", async (event) => {
   } catch (error) {
     console.error(error);
     productMessage.textContent = "Error: " + error.message;
+
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = productId.value ? "Update Product" : "Add Product";
   }
 });
 
-// Edit product
+// EDIT PRODUCT
 function editProduct(id) {
-  const product = products.find((item) => item.id === id);
+  const product = products.find(item => item.id === id);
   if (!product) return;
 
   productId.value = product.id;
   productName.value = product.name || "";
   productCategory.value = product.category || "";
   productPrice.value = product.price || "";
-  productImage.value = product.image || "";
 
-  currentImageURL = product.image || "";
+  currentImages = product.images?.length
+    ? [...product.images]
+    : product.image ? [product.image] : [];
 
-  if (currentImageURL) {
-    imagePreview.src = currentImageURL;
-    imagePreview.hidden = false;
-  }
+  productImages.value = "";
+  showPreviews(currentImages);
 
   document.getElementById("form-heading").textContent = "Edit Product";
   saveBtn.textContent = "Update Product";
@@ -269,9 +343,9 @@ function editProduct(id) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-// Delete product
+// DELETE PRODUCT
 async function deleteProduct(id) {
-  const product = products.find((item) => item.id === id);
+  const product = products.find(item => item.id === id);
   if (!product) return;
 
   if (!confirm(`Are you sure you want to delete "${product.name}"?`)) {
@@ -290,22 +364,22 @@ async function deleteProduct(id) {
   }
 }
 
-// Cancel edit
+// CANCEL EDIT
 cancelEdit.addEventListener("click", resetForm);
 
-// Reset form
+// RESET FORM
 function resetForm() {
   productForm.reset();
   productId.value = "";
-  currentImageURL = "";
+  currentImages = [];
 
-  imagePreview.src = "";
-  imagePreview.hidden = true;
+  imagePreview.replaceChildren();
 
   document.getElementById("form-heading").textContent = "Add New Product";
   saveBtn.textContent = "Add Product";
   cancelEdit.hidden = true;
 }
 
+// GLOBAL FUNCTIONS
 window.editProduct = editProduct;
 window.deleteProduct = deleteProduct;
