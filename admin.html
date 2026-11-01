@@ -95,15 +95,20 @@
             required
           >
 
-      <label>Product Image URL</label>
+<label>Product Images (Select Multiple)</label>
 <input
-  type="url"
-  id="product-image"
-  placeholder="Paste GitHub image URL"
-  required
+  type="file"
+  id="product-images"
+  accept="image/*"
+  multiple
 >
 
-<img id="image-preview" alt="Product preview" hidden>
+<div id="image-preview" class="image-preview"></div>
+
+<p class="message">
+  Select images from your phone gallery.
+</p>
+
           <div class="form-buttons">
             <button type="submit" id="save-btn">Add Product</button>
             <button type="button" id="cancel-edit" hidden>Cancel</button>
